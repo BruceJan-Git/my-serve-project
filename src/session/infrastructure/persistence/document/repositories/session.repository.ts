@@ -12,7 +12,7 @@ import { User } from '../../../../../users/domain/user';
 export class SessionDocumentRepository implements SessionRepository {
   constructor(
     @InjectModel(SessionSchemaClass.name)
-    private sessionModel: Model<SessionSchemaClass>,
+    private readonly sessionModel: Model<SessionSchemaClass>,
   ) {}
 
   async findById(id: Session['id']): Promise<NullableType<Session>> {
@@ -56,6 +56,21 @@ export class SessionDocumentRepository implements SessionRepository {
     return sessionObject ? SessionMapper.toDomain(sessionObject) : null;
   }
 
+  async updateByHash(
+    conditions: { id: Session['id']; hash: Session['hash'] },
+    payload: Partial<
+      Omit<Session, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>
+    >,
+  ): Promise<Session | null> {
+    const sessionObject = await this.sessionModel.findOneAndUpdate(
+      { _id: conditions.id.toString(), hash: conditions.hash },
+      { hash: payload.hash },
+      { new: true },
+    );
+
+    return sessionObject ? SessionMapper.toDomain(sessionObject) : null;
+  }
+
   async deleteById(id: Session['id']): Promise<void> {
     await this.sessionModel.deleteOne({ _id: id.toString() });
   }
@@ -71,10 +86,9 @@ export class SessionDocumentRepository implements SessionRepository {
     userId: User['id'];
     excludeSessionId: Session['id'];
   }): Promise<void> {
-    const transformedCriteria = {
+    await this.sessionModel.deleteMany({
       user: userId.toString(),
       _id: { $not: { $eq: excludeSessionId.toString() } },
-    };
-    await this.sessionModel.deleteMany(transformedCriteria);
+    });
   }
 }
